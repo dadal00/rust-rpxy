@@ -12,12 +12,50 @@ use hyper_util::client::legacy::{
   Client,
   connect::{Connect, HttpConnector},
 };
+
 use std::sync::Arc;
 #[cfg(feature = "custom")]
-use {cookie::Cookie, http::header::COOKIE};
+use {
+  cookie::Cookie,
+  hex,
+  http::header::COOKIE,
+  jsonwebtoken::{Algorithm, DecodingKey, Validation, decode},
+  moka::future::Cache,
+  serde::Deserialize,
+  sha2::{Digest, Sha256},
+  std::{
+    env,
+    sync::atomic::{AtomicI64, Ordering::Relaxed},
+    time::Duration,
+  },
+};
 
 #[cfg(feature = "cache")]
 use super::cache::{RpxyCache, get_policy_if_cacheable};
+
+#[derive(Clone, Debug)]
+pub struct CustomSettings {
+  moka_cache: Cache<String, Arc<AtomicI64>>,
+  jwt_key: String,
+}
+
+impl CustomSettings {
+  pub(crate) async fn new(globals: &Globals) -> Self {
+    Self {
+      moka_cache: Cache::builder()
+        .max_capacity(globals.proxy_config.custom_max_entries as u64)
+        .time_to_live(Duration::from_millis(globals.proxy_config.custom_rate_limit_ms as u64))
+        .build(),
+      jwt_key: env::var("JWT_KEY").expect("JWT_KEY must be set"),
+    }
+  }
+}
+
+#[derive(Deserialize)]
+struct Claims {
+  #[allow(unused)]
+  exp: usize,
+}
 
 #[async_trait]
 /// Definition of the forwarder that simply forward requests from downstream client to upstream app servers.
@@ -30,6 +68,8 @@ pub trait ForwardRequest<B1, B2> {
 pub struct Forwarder<C, B> {
   #[cfg(feature = "cache")]
   cache: Option<RpxyCache>,
+  #[cfg(feature = "custom")]
+  custom: CustomSettings,
   inner: Client<C, B>,
   inner_h2: Client<C, B>, // `h2c` or http/2-only client is defined separately
 }
@@ -47,20 +87,58 @@ where
   async fn request(&self, req: Request<B1>) -> Result<Response<ResponseBody>, Self::Error> {
     #[cfg(feature = "custom")]
     {
-      println!("Hello!");
-      // let mut session_id = None;
+      let mut user_jwt = None;
 
-      // if let Some(cookie_header) = req.headers().get(COOKIE) {
-      //   if let Ok(cookie_str) = cookie_header.to_str() {
-      //     for cookie in cookie_str.split(';') {
-      //       if let Ok(parsed) = Cookie::parse(cookie.trim()) {
-      //         if parsed.name() == "session_id" {
-      //           session_id = Some(parsed.value().to_string());
-      //         }
-      //       }
-      //     }
-      //   }
-      // }
+      // check if user has jwt cookie
+      if let Some(cookie_header) = req.headers().get(COOKIE) {
+        if let Ok(cookie_str) = cookie_header.to_str() {
+          for cookie in Cookie::split_parse(cookie_str) {
+            let cookie = cookie.unwrap();
+
+            if cookie.name() == "user_jwt" {
+              user_jwt = Some(cookie.value().to_string());
+            }
+          }
+
+          if user_jwt.is_none() {
+            return Err(Self::Error::InvalidCredentials(
+              "Missing or invalid user_jwt cookie".to_string(),
+            ));
+          }
+        }
+      }
+
+      // check if valid signature and expiration
+      if decode::<Claims>(
+        user_jwt.as_ref().expect("cookie should be here"),
+        &DecodingKey::from_secret(self.custom.jwt_key.as_bytes()),
+        &Validation::new(Algorithm::HS256),
+      )
+      .is_err()
+      {
+        return Err(Self::Error::InvalidCredentials(
+          "Missing or invalid user_jwt cookie".to_string(),
+        ));
+      };
+
+      // generate hash string to lookup
+      let mut hasher = Sha256::new();
+      hasher.update(user_jwt.expect("cookie has been verified"));
+      let hashed_string = hex::encode(hasher.finalize());
+
+      // grab or insert the timestamp
+      let counter = self
+        .custom
+        .moka_cache
+        .get_with(hashed_string.clone(), async { Arc::new(AtomicI64::new(0)) })
+        .await;
+
+      // atomically fetch add the same arc reference
+      if counter.fetch_add(1, Relaxed) > 0 {
+        return Err(Self::Error::RateLimitExceeded(
+          "Too many requests - Rate limit exceeded".to_string(),
+        ));
+      }
     }
 
     // TODO: cache handling
@@ -164,6 +242,8 @@ Enable 'native-tls-backend' or 'rustls-backend' feature for TLS support.
       inner_h2,
       #[cfg(feature = "cache")]
       cache: RpxyCache::new(_globals).await,
+      #[cfg(feature = "custom")]
+      custom: CustomSettings::new(_globals).await,
     })
   }
 }
@@ -209,6 +289,8 @@ where
       inner_h2,
       #[cfg(feature = "cache")]
       cache: RpxyCache::new(_globals).await,
+      #[cfg(feature = "custom")]
+      custom: CustomSettings::new(_globals).await,
     })
   }
 }
@@ -255,6 +337,8 @@ where
       inner_h2,
       #[cfg(feature = "cache")]
       cache: RpxyCache::new(_globals).await,
+      #[cfg(feature = "custom")]
+      custom: CustomSettings::new(_globals).await,
     })
   }
 }

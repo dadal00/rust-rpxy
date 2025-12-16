@@ -133,6 +133,13 @@ pub struct AcmeOption {
   pub registry_path: Option<String>,
 }
 
+#[cfg(feature = "custom")]
+#[derive(Deserialize, Debug, Default, PartialEq, Eq, Clone)]
+pub struct CustomOptions {
+  pub rate_limit_ms: Option<usize>,
+  pub max_entries: Option<usize>,
+}
+
 #[derive(Deserialize, Debug, Default, PartialEq, Eq, Clone)]
 pub struct Experimental {
   #[cfg(any(feature = "http3-quinn", feature = "http3-s2n"))]
@@ -143,6 +150,9 @@ pub struct Experimental {
 
   #[cfg(feature = "acme")]
   pub acme: Option<AcmeOption>,
+
+  #[cfg(feature = "custom")]
+  pub custom: Option<CustomOptions>,
 
   pub ignore_sni_consistency: Option<bool>,
   pub connection_handling_timeout: Option<u64>,
@@ -306,6 +316,16 @@ impl TryInto<ProxyConfig> for &ConfigToml {
         }
         if let Some(num) = cache_option.max_cache_each_size_on_memory {
           proxy_config.cache_max_each_size_on_memory = num;
+        }
+      }
+
+      #[cfg(feature = "custom")]
+      if let Some(custom_option) = &exp.custom {
+        if let Some(ttl_s) = custom_option.rate_limit_ms {
+          proxy_config.custom_rate_limit_ms = ttl_s;
+        }
+        if let Some(max_entries) = custom_option.max_entries {
+          proxy_config.custom_max_entries = max_entries;
         }
       }
     }

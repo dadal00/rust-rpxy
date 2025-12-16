@@ -5,6 +5,12 @@ pub type RpxyResult<T> = std::result::Result<T, RpxyError>;
 /// Describes things that can go wrong in the Rpxy
 #[derive(Debug, Error)]
 pub enum RpxyError {
+  // custom errors
+  #[error("Unauthorized: {0}")]
+  InvalidCredentials(String),
+  #[error("Rate limit exceeded: {0}")]
+  RateLimitExceeded(String),
+
   // general errors
   #[error("IO error: {0}")]
   Io(#[from] std::io::Error),

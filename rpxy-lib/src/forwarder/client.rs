@@ -13,6 +13,8 @@ use hyper_util::client::legacy::{
   connect::{Connect, HttpConnector},
 };
 use std::sync::Arc;
+#[cfg(feature = "custom")]
+use {cookie::Cookie, http::header::COOKIE};
 
 #[cfg(feature = "cache")]
 use super::cache::{RpxyCache, get_policy_if_cacheable};
@@ -43,6 +45,24 @@ where
   type Error = RpxyError;
 
   async fn request(&self, req: Request<B1>) -> Result<Response<ResponseBody>, Self::Error> {
+    #[cfg(feature = "custom")]
+    {
+      println!("Hello!");
+      // let mut session_id = None;
+
+      // if let Some(cookie_header) = req.headers().get(COOKIE) {
+      //   if let Ok(cookie_str) = cookie_header.to_str() {
+      //     for cookie in cookie_str.split(';') {
+      //       if let Ok(parsed) = Cookie::parse(cookie.trim()) {
+      //         if parsed.name() == "session_id" {
+      //           session_id = Some(parsed.value().to_string());
+      //         }
+      //       }
+      //     }
+      //   }
+      // }
+    }
+
     // TODO: cache handling
     #[cfg(feature = "cache")]
     {

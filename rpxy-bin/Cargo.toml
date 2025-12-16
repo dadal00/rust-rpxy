@@ -20,6 +20,8 @@ default = [
   "sticky-cookie",
   "acme",
   "post-quantum",
+  # Custom
+  "custom",
 ]
 # default = [
 #   "http3-s2n",
@@ -38,6 +40,8 @@ cache = ["rpxy-lib/cache"]
 acme = ["rpxy-lib/acme", "rpxy-acme"]
 post-quantum = ["rpxy-lib/post-quantum"]
 sticky-cookie = ["rpxy-lib/sticky-cookie"]
+# Custom
+custom = ["rpxy-lib/custom"]
 
 [dependencies]
 rpxy-lib = { path = "../rpxy-lib/", default-features = false }

@@ -13,6 +13,9 @@ publish.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+# Custom
+custom = ["cookie"]
+
 http3-quinn = ["socket2", "quinn", "h3", "h3-quinn", "rpxy-certs/http3"]
 http3-s2n = [
   "s2n-quic",
@@ -35,7 +38,11 @@ post-quantum = [
   "s2n-quic-rustls/post-quantum",
 ]
 
+
 [dependencies]
+# Custom
+cookie = { version = "0.18", optional = true }
+
 rand = "0.9.2"
 ahash = "0.8.12"
 bytes = "1.11.0"

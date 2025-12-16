@@ -99,13 +99,13 @@ where
               user_jwt = Some(cookie.value().to_string());
             }
           }
-
-          if user_jwt.is_none() {
-            return Err(Self::Error::InvalidCredentials(
-              "Missing or invalid user_jwt cookie".to_string(),
-            ));
-          }
         }
+      }
+
+      if user_jwt.is_none() {
+        return Err(Self::Error::InvalidCredentials(
+          "Missing or invalid user_jwt cookie".to_string(),
+        ));
       }
 
       // check if valid signature and expiration

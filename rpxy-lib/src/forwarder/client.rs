@@ -24,6 +24,7 @@ use {
   serde::Deserialize,
   sha2::{Digest, Sha256},
   std::{
+    collections::HashSet,
     env,
     sync::atomic::{AtomicI64, Ordering::Relaxed},
     time::Duration,
@@ -35,16 +36,23 @@ use super::cache::{RpxyCache, get_policy_if_cacheable};
 
 #[derive(Clone, Debug)]
 pub struct CustomSettings {
-  moka_cache: Cache<String, Arc<AtomicI64>>,
+  fast_moka_cache: Cache<String, Arc<AtomicI64>>,
+  fast_paths: HashSet<String>,
+  slow_moka_cache: Cache<String, Arc<AtomicI64>>,
   jwt_key: String,
 }
 
 impl CustomSettings {
   pub(crate) async fn new(globals: &Globals) -> Self {
     Self {
-      moka_cache: Cache::builder()
+      fast_moka_cache: Cache::builder()
         .max_capacity(globals.proxy_config.custom_max_entries as u64)
-        .time_to_live(Duration::from_millis(globals.proxy_config.custom_rate_limit_ms as u64))
+        .time_to_live(Duration::from_millis(globals.proxy_config.custom_fast_rate_limit_ms as u64))
+        .build(),
+      fast_paths: globals.proxy_config.custom_fast_paths.clone(),
+      slow_moka_cache: Cache::builder()
+        .max_capacity(globals.proxy_config.custom_max_entries as u64)
+        .time_to_live(Duration::from_millis(globals.proxy_config.custom_slow_rate_limit_ms as u64))
         .build(),
       jwt_key: env::var("JWT_KEY").expect("JWT_KEY must be set"),
     }
@@ -87,6 +95,8 @@ where
   async fn request(&self, req: Request<B1>) -> Result<Response<ResponseBody>, Self::Error> {
     #[cfg(feature = "custom")]
     {
+      use std::path;
+
       let mut user_jwt = None;
 
       // check if user has jwt cookie
@@ -126,15 +136,31 @@ where
       hasher.update(user_jwt.expect("cookie has been verified"));
       let hashed_string = hex::encode(hasher.finalize());
 
-      // grab or insert the timestamp
-      let counter = self
-        .custom
-        .moka_cache
-        .get_with(hashed_string.clone(), async { Arc::new(AtomicI64::new(0)) })
-        .await;
+      let host = req.uri().host().unwrap_or_default().to_string();
+      let path = req.uri().path().to_string();
+      let full_path = format!("{}{}", host, path);
+
+      let mut counter = None;
+      if !full_path.is_empty() && self.custom.fast_paths.contains(&full_path) {
+        counter = Some(
+          self
+            .custom
+            .fast_moka_cache
+            .get_with(hashed_string.clone(), async { Arc::new(AtomicI64::new(0)) })
+            .await,
+        );
+      } else {
+        counter = Some(
+          self
+            .custom
+            .slow_moka_cache
+            .get_with(hashed_string.clone(), async { Arc::new(AtomicI64::new(0)) })
+            .await,
+        );
+      }
 
       // atomically fetch add the same arc reference
-      if counter.fetch_add(1, Relaxed) > 0 {
+      if counter.expect("counter should be processed").fetch_add(1, Relaxed) > 0 {
         return Err(Self::Error::RateLimitExceeded(
           "Too many requests - Rate limit exceeded".to_string(),
         ));

@@ -136,7 +136,9 @@ pub struct AcmeOption {
 #[cfg(feature = "custom")]
 #[derive(Deserialize, Debug, Default, PartialEq, Eq, Clone)]
 pub struct CustomOptions {
-  pub rate_limit_ms: Option<usize>,
+  pub fast_rate_limit_ms: Option<usize>,
+  pub fast_paths: Option<Vec<String>>,
+  pub slow_rate_limit_ms: Option<usize>,
   pub max_entries: Option<usize>,
 }
 
@@ -321,8 +323,14 @@ impl TryInto<ProxyConfig> for &ConfigToml {
 
       #[cfg(feature = "custom")]
       if let Some(custom_option) = &exp.custom {
-        if let Some(ttl_s) = custom_option.rate_limit_ms {
-          proxy_config.custom_rate_limit_ms = ttl_s;
+        if let Some(fast_ttl_ms) = custom_option.fast_rate_limit_ms {
+          proxy_config.custom_fast_rate_limit_ms = fast_ttl_ms;
+        }
+        if let Some(fast_paths) = &custom_option.fast_paths {
+          proxy_config.custom_fast_paths.extend(fast_paths.clone());
+        }
+        if let Some(slow_ttl_ms) = custom_option.slow_rate_limit_ms {
+          proxy_config.custom_slow_rate_limit_ms = slow_ttl_ms;
         }
         if let Some(max_entries) = custom_option.max_entries {
           proxy_config.custom_max_entries = max_entries;

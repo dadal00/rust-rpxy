@@ -1,6 +1,8 @@
 use crate::{constants::*, count::RequestCount};
 use hot_reload::ReloaderReceiver;
 use rpxy_certs::ServerCryptoBase;
+#[cfg(feature = "custom")]
+use std::collections::HashSet;
 use std::{net::SocketAddr, time::Duration};
 
 /// Global object containing proxy configurations and shared object like counters.
@@ -64,7 +66,11 @@ pub struct ProxyConfig {
   pub cache_max_each_size_on_memory: usize,
 
   #[cfg(feature = "custom")]
-  pub custom_rate_limit_ms: usize,
+  pub custom_fast_rate_limit_ms: usize,
+  #[cfg(feature = "custom")]
+  pub custom_fast_paths: HashSet<String>,
+  #[cfg(feature = "custom")]
+  pub custom_slow_rate_limit_ms: usize,
   #[cfg(feature = "custom")]
   pub custom_max_entries: usize,
 
@@ -117,7 +123,11 @@ impl Default for ProxyConfig {
       cache_max_each_size_on_memory: MAX_CACHE_EACH_SIZE_ON_MEMORY,
 
       #[cfg(feature = "custom")]
-      custom_rate_limit_ms: 360,
+      custom_fast_rate_limit_ms: 200,
+      #[cfg(feature = "custom")]
+      custom_fast_paths: HashSet::new(),
+      #[cfg(feature = "custom")]
+      custom_slow_rate_limit_ms: 2000,
       #[cfg(feature = "custom")]
       custom_max_entries: 10000,
 

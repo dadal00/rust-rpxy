@@ -95,8 +95,6 @@ where
   async fn request(&self, req: Request<B1>) -> Result<Response<ResponseBody>, Self::Error> {
     #[cfg(feature = "custom")]
     {
-      use std::path;
-
       let mut user_jwt = None;
 
       // check if user has jwt cookie
@@ -140,9 +138,9 @@ where
       let path = req.uri().path().to_string();
       let full_path = format!("{}{}", host, path);
 
-      let mut counter = None;
+      let mut _counter = None;
       if !full_path.is_empty() && self.custom.fast_paths.contains(&full_path) {
-        counter = Some(
+        _counter = Some(
           self
             .custom
             .fast_moka_cache
@@ -150,7 +148,7 @@ where
             .await,
         );
       } else {
-        counter = Some(
+        _counter = Some(
           self
             .custom
             .slow_moka_cache
@@ -160,7 +158,7 @@ where
       }
 
       // atomically fetch add the same arc reference
-      if counter.expect("counter should be processed").fetch_add(1, Relaxed) > 0 {
+      if _counter.expect("counter should be processed").fetch_add(1, Relaxed) > 0 {
         return Err(Self::Error::RateLimitExceeded(
           "Too many requests - Rate limit exceeded".to_string(),
         ));

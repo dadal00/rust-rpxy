@@ -12,8 +12,8 @@ echo "rpxy: Logging with level ${LOG_LEVEL}"
 
 if "${LOGGING}"; then
   echo "rpxy: Start with writing log files"
-  RUST_LOG=${LOG_LEVEL} /rpxy/bin/rpxy --config ${CONFIG_FILE} --log-dir ${LOG_DIR}
+  JWT_KEY=$(cat /run/secrets/JWT_KEY) RUST_LOG=${LOG_LEVEL} /rpxy/bin/rpxy --config ${CONFIG_FILE} --log-dir ${LOG_DIR}
 else
   echo "rpxy: Start without writing log files"
-  RUST_LOG=${LOG_LEVEL} /rpxy/bin/rpxy --config ${CONFIG_FILE}
+  JWT_KEY=$(cat /run/secrets/JWT_KEY) RUST_LOG=${LOG_LEVEL} /rpxy/bin/rpxy --config ${CONFIG_FILE}
 fi

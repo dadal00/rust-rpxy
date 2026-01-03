@@ -43,13 +43,12 @@ jobs:
           echo "REMOTE_MSG=${SANITIZED_MSG:-no-msg}" >> "$GITHUB_ENV"
 
       - name: Build and push
-        if: github.ref == 'refs/heads/base'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/Dockerfile
           platforms: "linux/arm64"
-          push: true
-          cache-to: gha
-          cache-from: gha
+          push: ${{ github.ref == 'refs/heads/base' }}
+          cache-to: type=gha
+          cache-from: type=gha
           tags: ${{ env.REMOTE }},${{ env.REMOTE_SHA }},${{ env.REMOTE_MSG }}

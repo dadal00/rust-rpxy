@@ -51,4 +51,7 @@ jobs:
           push: ${{ github.ref == 'refs/heads/base' }}
           cache-to: type=gha
           cache-from: type=gha
-          tags: ${{ env.REMOTE_LATEST }},${{ env.REMOTE_SHA }},${{ env.REMOTE_MSG }}
+          tags: |
+            ${{ env.REMOTE_LATEST }}
+            ${{ env.REMOTE_SHA }}
+            ${{ env.REMOTE_MSG }}

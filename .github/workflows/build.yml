@@ -41,7 +41,7 @@ jobs:
           echo "REMOTE_MSG=${SANITIZED_MSG:-no-msg}" >> "$GITHUB_ENV"
 
       - name: Build and push
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/base'
         uses: docker/build-push-action@v6
         with:
           context: .

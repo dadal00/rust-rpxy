@@ -46,7 +46,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./backend/Dockerfile
+          file: ./docker/Dockerfile
           platforms: "linux/arm64"
           push: ${{ github.ref == 'refs/heads/base' }}
           cache-to: type=gha

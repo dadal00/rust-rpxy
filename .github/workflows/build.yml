@@ -33,22 +33,22 @@ jobs:
       - name: Generate image tags
         run: |
           REMOTE="ghcr.io/${{ github.repository_owner }}/reverse_proxy"
-          echo "REMOTE=$REMOTE" >> "$GITHUB_ENV"
+          echo "REMOTE_LATEST=$REMOTE:latest" >> "$GITHUB_ENV"
 
           SHA="${{ github.sha }}"
-          echo "REMOTE_SHA=${SHA:0:7}" >> "$GITHUB_ENV"
+          echo "REMOTE_SHA=$REMOTE:${SHA:0:7}" >> "$GITHUB_ENV"
 
           RAW_MSG="${{ github.event.head_commit.message }}"
           SANITIZED_MSG=$(printf '%s' "$RAW_MSG" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9._-')
-          echo "REMOTE_MSG=${SANITIZED_MSG:-no-msg}" >> "$GITHUB_ENV"
+          echo "REMOTE_MSG=$REMOTE:${SANITIZED_MSG:-no-msg}" >> "$GITHUB_ENV"
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./docker/Dockerfile
+          file: ./backend/Dockerfile
           platforms: "linux/arm64"
           push: ${{ github.ref == 'refs/heads/base' }}
           cache-to: type=gha
           cache-from: type=gha
-          tags: ${{ env.REMOTE }},${{ env.REMOTE_SHA }},${{ env.REMOTE_MSG }}
+          tags: ${{ env.REMOTE_LATEST }},${{ env.REMOTE_SHA }},${{ env.REMOTE_MSG }}

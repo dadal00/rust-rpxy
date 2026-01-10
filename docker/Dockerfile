@@ -34,7 +34,10 @@ ENV RUSTFLAGS="-C link-arg=-s"
 
 RUN update-ca-certificates 2> /dev/null || true
 
-RUN apt-get update && apt-get install -qy --no-install-recommends $BUILD_DEPS ${ADDITIONAL_DEPS} && \
+RUN rm -rf /var/lib/apt/lists/* && \
+  echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99nopipeline && \
+  echo 'Acquire::http::No-Cache "true";' > /etc/apt/apt.conf.d/99nocache && \
+  apt-get update && apt-get install -qy --no-install-recommends $BUILD_DEPS ${ADDITIONAL_DEPS} && \
   curl -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable && \
   export PATH="$HOME/.cargo/bin:$PATH" && \
   echo "Install toolchain" && \
@@ -49,7 +52,10 @@ FROM --platform=$TARGETPLATFORM base AS runner
 
 ENV RUNTIME_DEPS="logrotate ca-certificates gosu"
 
-RUN apt-get update && \
+RUN rm -rf /var/lib/apt/lists/* && \
+  echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99nopipeline && \
+  echo 'Acquire::http::No-Cache "true";' > /etc/apt/apt.conf.d/99nocache && \
+  apt-get update && \
   apt-get install -qy --no-install-recommends $RUNTIME_DEPS && \
   apt-get -qy clean && \
   apt-get -qy autoremove && \
